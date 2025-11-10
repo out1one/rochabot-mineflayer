@@ -1,84 +1,66 @@
+// index.js
+const mineflayer = require('mineflayer');
+const express = require('express');
 
-const mineflayer = require('mineflayer')
-const cmd = require('mineflayer-cmd').plugin
-const fs = require('fs');
-let rawdata = fs.readFileSync('config.json');
-let data = JSON.parse(rawdata);
-var lasttime = -1;
-var moving = 0;
-var connected = 0;
-var actions = [ 'forward', 'back', 'left', 'right']
-var lastaction;
-var pi = 3.14159;
-var moveinterval = 2;
-var maxrandom = 5;
-var host = data["ip"];
-var port = parseInt(data["port"]);
-var username = data["name"]
-var nightskip = data["auto-night-skip"]
+// =====================
+// Configuración del bot
+// =====================
+const BOT_USERNAME = process.env.BOT_USERNAME || 'rochabot'; // nombre del bot
+const SERVER_HOST = process.env.SERVER_HOST || 'rochachipamepija.aternos.me';
+const SERVER_PORT = parseInt(process.env.SERVER_PORT) || 15153;
+const MC_VERSION = process.env.MC_VERSION || '1.21.10';
+const RECONNECT_DELAY = 10000; // 10 segundos
 
-var bot = mineflayer.createBot({
-  host: host,
-  port: port,
-  username: username
-});
+// =====================
+// Función para crear el bot
+// =====================
+function createBot() {
+  const bot = mineflayer.createBot({
+    host: SERVER_HOST,
+    port: SERVER_PORT,
+    username: BOT_USERNAME,
+    version: MC_VERSION
+  });
 
-function getRandomArbitrary(min, max) {
-    return Math.random() * (max - min) + min;
+  bot.on('login', () => {
+    console.log(`Bot conectado al servidor ${SERVER_HOST}:${SERVER_PORT}`);
+  });
+
+  bot.on('end', () => {
+    console.log(`Bot desconectado. Reintentando en ${RECONNECT_DELAY / 1000}s...`);
+    setTimeout(createBot, RECONNECT_DELAY);
+  });
+
+  bot.on('error', (err) => {
+    console.log('Error del bot:', err);
+  });
+
+  // =====================
+  // Movimiento anti-AFK
+  // =====================
+  bot.setControlState('forward', true); // camina siempre hacia adelante
+
+  setInterval(() => {
+    bot.setControlState('jump', true); // salta cada tanto
+    setTimeout(() => bot.setControlState('jump', false), 500);
+  }, 10000); // cada 10 segundos
+
+  return bot;
 }
 
-bot.loadPlugin(cmd)
+// Inicia el bot
+createBot();
 
-console.log(`Starting bot...`);
-console.log(`Connecting to ${host}:${port} as ${username}`);
+// =====================
+// Servidor web mínimo para Render
+// =====================
+const app = express();
+const port = process.env.PORT || 3000;
 
-bot.on('error', function(err) {
-    console.log("Error:", err);
+app.get('/', (req, res) => {
+  res.send('Bot activo ✅');
 });
 
-bot.on('kicked', function(reason) {
-    console.log("Kicked:", reason);
-});
-
-bot.on('end', function() {
-    console.log("Connection ended");
-});
-
-bot.on('time', function(time) {
-    if(nightskip == "true"){
-        if(bot.time.timeOfDay >= 13000){
-            bot.chat('/time set day')
-        }
-    }
-    if (connected < 1) return;
-
-    if (lasttime < 0) {
-        lasttime = bot.time.age;
-    } else {
-        var randomadd = Math.random() * maxrandom * 20;
-        var interval = moveinterval * 20 + randomadd;
-        if (bot.time.age - lasttime > interval) {
-            if (moving == 1) {
-                bot.setControlState(lastaction, false);
-                moving = 0;
-                lasttime = bot.time.age;
-            } else {
-                var yaw = Math.random() * pi - (0.5 * pi);
-                var pitch = Math.random() * pi - (0.5 * pi);
-                bot.look(yaw, pitch, false);
-                lastaction = actions[Math.floor(Math.random() * actions.length)];
-                bot.setControlState(lastaction, true);
-                moving = 1;
-                lasttime = bot.time.age;
-            }
-        }
-    }
-});
-
-bot.on('spawn', function() {
-    connected = 1;
-});
-
-bot.on('death', function() {
-    bot.emit("respawn")
+app.listen(port, () => {
+  console.log(`Servidor web escuchando en el puerto ${port}`);
 });
