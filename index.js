@@ -4,7 +4,7 @@ const fetch = require('node-fetch');
 
 const SERVER_HOST = 'rochachipamepija.aternos.me';
 const SERVER_PORT = 15153;
-const BOT_USERNAME = 'rochabot';
+const BOT_USERNAME = 'Rochita_Bot';
 
 let bot;
 
